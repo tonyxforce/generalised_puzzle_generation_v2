@@ -83,7 +83,7 @@ class UrjoBoard():
         return board
 
     def snapshot_state(self):
-        """stores the current board to revert too later"""
+        """Stores the current board to revert to later"""
         snap = []
         for row in self.rows:
             for sq in row.get_squares():
@@ -91,13 +91,13 @@ class UrjoBoard():
         return snap
 
     def restore_state(self, snapshot):
-        """reverts to the saved board"""
+        """Reverts to the saved board"""
         for sq, col, hidden in snapshot:
             sq.color = col
             sq.hidden_bool = hidden
 
     def hide_numbers(self, remaining_numbers):
-        """hides all but remaining_numbers numbers"""
+        """Hides all but remaining_numbers numbers"""
         random.shuffle(self.all_numbers)
         for i,number in enumerate(self.all_numbers):
              if i < remaining_numbers:
@@ -106,7 +106,7 @@ class UrjoBoard():
                 number.number_hidden = True
 
     def get_surrounding_slots(self, square):
-        """returns the surrounding slots around a square"""
+        """Returns the surrounding slots around a square"""
         r = square.row_index
         c = square.column_index
         rows = len(self.rows)
@@ -132,7 +132,7 @@ class UrjoBoard():
         return up_left, up, up_right, left, right, down_left, down, down_right
 
     def get_number(self, slot):
-        """gets the number for a slot, doesnt work if not all slots are colored"""
+        """Gets the number for a slot, doesnt work if not all slots are colored"""
         surrounding_slots = self.get_surrounding_slots(slot)
         color = slot.color
         total = 0
@@ -143,13 +143,13 @@ class UrjoBoard():
         slot.number = total
 
     def fill_numbers(self):
-        """puts all numbers on the full board"""
+        """Puts all numbers on the full board"""
         for row in self.rows:
             for square in row.row:
                 self.get_number(square)
 
     def number_check(self, number):
-        """checks if the number rule is violated"""
+        """Checks if the number rule is violated"""
         integer = number.get_number()
         if integer is None:
             return True
@@ -163,7 +163,7 @@ class UrjoBoard():
 
         def feasible(required_same, same_count, opp_count, uncol):
             """
-            checks the feasibility for a single color
+            Checks the feasibility for a single color
             """
             # current cannot exceed target
             if same_count > required_same:
@@ -195,7 +195,7 @@ class UrjoBoard():
             return ok_blue or ok_red
 
     def to_url_format(self):
-        """sends the current puzzle into a url format"""
+        """Sends the current puzzle into a url format"""
         alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         chars = []
 
@@ -220,9 +220,10 @@ class UrjoBoard():
         return "".join(chars)
 
     def fill_board_backtracking(self, randomize_colors=True):
-        """color the whole board using backtracking so no row or column violates allowed_size, fill rules, or,
-         creates identical adjacent rows/columns. this doesnt take numbers into account at all, only filling a possible
-         color arangement
+        """
+        Color the whole board using backtracking so no row or column violates allowed_size, fill rules, or,
+        creates identical adjacent rows/columns. this doesnt take numbers into account at all, only filling a possible
+        color arangement
         """
         squares = [sq for row in self.rows for sq in row.get_squares()]
 
@@ -313,15 +314,15 @@ class UrjoBoard():
 
 
     def fill_row(self, row):
-        """fills a row if it can be filled with a color"""
+        """Fills a row if it can be filled with a color"""
         return self.__fill__(row, math.ceil(len(row.row)/2))
 
     def fill_column(self, column):
-        """fills a column if it can be filled with a color"""
+        """Fills a column if it can be filled with a color"""
         return self.__fill__(column, math.ceil(len(column.column)/2))
 
     def __fill__(self, obj, max):
-        """fills an object will required remaining colors if possible else does nothing"""
+        """Fills an object will required remaining colors if possible, else does nothing"""
         red, blue, uncolored = obj.count_colors()
         squares = []
         if red == max:
@@ -370,14 +371,14 @@ class UrjoBoard():
             raise ValueError("Unable to color board with current constraints") # mostly only happens if the board is weirdly shaped in a way that makes the rules not possible
 
     def uncolor_square(self, square, number_checks=True,row_checks=True, identical_checks=True, contradiction_count=1, max_steps_without_info=4):
-        """sees if a square can be uncolored and the information recovered due to the other color being impossible to be there"""
+        """Sees if a square can be uncolored and the information recovered due to the other color being impossible to be there"""
         if self.can_be_color(square, invert_color(square.color), number_checks,row_checks, identical_checks, contradiction_count, original_contradiction=contradiction_count, max_steps_without_info=max_steps_without_info):
             return False
         square.hidden_bool = True
         return True
 
     def check_identical(self, slot):
-        """checks for identicality"""
+        """Checks wether neighboring lines are the same"""
         # row checks (compare current row to row above and below if they exist)
         r_idx = slot.row_index
         if r_idx > 0:
@@ -510,16 +511,16 @@ class UrjoBoard():
 
     def check_surrounding_numbers(self, slot):
         """
-        return False if any surrounding numbered cell's checks doesnt work
+        Check whether every surrounding numbered cell's checks pass
         """
-        for number in self.get_surrounding_slots(slot):
-            if number is not None:
-                if not self.number_check(number):
+        for slot in self.get_surrounding_slots(slot):
+            if slot is not None:
+                if not self.number_check(slot):
                     return False
         return True
 
     def unfill(self, integer):
-        """duplicate function for unfilling numbers, dont know why I made two, this code has gotten so long im not noticing a lot"""
+        """Duplicate function for unfilling numbers, dont know why I made two, this code has gotten so long im not noticing a lot"""
         random.shuffle(self.all_numbers)
 
         for i, sq in enumerate(self.all_numbers):
@@ -548,7 +549,7 @@ class UrjoBoard():
             self.uncolor_square(slot, number_checks, row_checks, identical_checks, contradiction_count, max_steps_without_info=max_steps_without_info)
 
     def true_check(self):
-        """only for testing purposes to make sure the row/column counts didnt mess up which it was earlier"""
+        """Only for testing purposes to make sure the row/column counts didn't mess up which it was earlier"""
         puzzle = self.to_url_format()
         checks = []
 
@@ -568,8 +569,8 @@ class UrjoBoard():
     
 def fill_single_number(number):
     """
-    fills the number cell and/or its surrounding slots and returns a tuple(bool, list) indicating whether it has changed anything and
-     what it has changed if it has
+    Fills the number cell and/or its surrounding slots and returns a tuple(bool, list)
+    indicating whether it has changed anything and if it has, what
     """
 
     if number is None:

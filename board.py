@@ -206,8 +206,8 @@ class UrjoBoard():
                 else:
                     num_val = 0
 
-                if num_val > 15:
-                    raise ValueError("Number too large to encode (max 15)") # Never encountered in real world scenarios
+                if num_val > 15 or num_val < 0:
+                    raise ValueError(f"Invalid number {num_val} received") # Never encountered in real world scenarios
 
                 color_bit = 0 if sq.color == "blue" else 1
 
@@ -574,7 +574,7 @@ def fill_single_number(number):
     """
 
     if number is None:
-        return False, []
+        raise ValueError("Invalid number received")
 
     target = number.get_number()
     if target is None:

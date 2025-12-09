@@ -5,9 +5,8 @@ from typing import List
 class UrjoGenerator():
     """The Urjo puzzle, made up of rows and columns"""
 
-    def __init__(self, rows: List[UrjoRow] = [], columns: List[UrjoColumn] = []):
+    def __init__(self):
         self.board = UrjoBoard()
-        self.contradiction_count: int = 0
         self.removed_by_identical: int = 0
 
     def number_check(self, slot: UrjoSquare):
@@ -386,7 +385,7 @@ class UrjoGenerator():
                                            contradiction_count - 1, original_contradiction)
                 if not ok_blue and not ok_red:
                     if contradiction_count == original_contradiction:
-                        self.contradiction_count += 1
+                        self.board.contradiction_count += 1
                     self.board.restore_state(state)
 
                     return False

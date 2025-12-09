@@ -1,5 +1,9 @@
 import math
 
+from typing import List, Literal
+
+from square import UrjoSquare
+
 class RowColumnParent:
     """Row and Columns are at their heart the same thing, so both direct into this parent class which does all the calculations"""
     attribute_name = None   # overrided in subclasses to be either .row or .column
@@ -12,7 +16,7 @@ class RowColumnParent:
         """
         Lowkey a mess of a method honestly, just ignore it
         """
-        colors = []
+        colors: List[Literal["red", "blue"]] = []
         for square in self.get_squares():
             c = square.get_color()
             if c is None:
@@ -54,7 +58,7 @@ class RowColumnParent:
             return False
         return True
 
-    def get_squares(self):
+    def get_squares(self) -> List[UrjoSquare]:
         """gets all squares in the row/column"""
         if hasattr(self, "row"):
             return self.row
@@ -81,12 +85,20 @@ class RowColumnParent:
 class UrjoRow(RowColumnParent):
     """row object inheriting directly from the rowcolumn parent"""
     attribute_name = "row"
+    def __init__(self, value):
+        setattr(self, self.attribute_name, value)
+        self.allowed_size = None
+        self.row: List[UrjoSquare] = []
 
 class UrjoColumn(RowColumnParent):
     """column object inheriting directly from the rowcolumn parent"""
     attribute_name = "column"
+    def __init__(self, value):
+        setattr(self, self.attribute_name, value)
+        self.allowed_size = None
+        self.column: List[UrjoSquare] = []
 
-def get_color_counts(slots):
+def get_color_counts(slots: List[UrjoSquare]):
     """counts each color in the provided slots"""
     red = 0
     blue = 0
@@ -111,14 +123,14 @@ def not_identical(lst, index):
             return False
     return True
 
-def lines_different(line_1, line_2):
+def lines_different(line_1: UrjoRow | UrjoColumn, line_2: UrjoRow | UrjoColumn):
     """returns False if two lines are the same, to be honest dont trust this due to eq and cmp_key not really working"""
     for i, sq in enumerate(line_1):
         if sq.get_color() != line_2[i].get_color():
             return True
     return False
 
-def check_row_and_column(square):
+def check_row_and_column(square: UrjoSquare):
     """checks the row and column for a slot"""
     if square.row.check_row_critera() and square.column.check_row_critera():
         return True

@@ -1,22 +1,19 @@
 import random
-from collections import deque
 
-from typing import List
+from typing import List, Tuple
 
 from lines import *
-from square import *
+from cell import *
 
-
-class UrjoBoard():
+class Board():
     """The Urjo puzzle, made up of rows and columns"""
 
     def __init__(self, rows: List[UrjoRow] = [], columns: list[UrjoColumn] = []):
         self.rows = rows
         self.columns = columns
-        self.numbered_slots = []
-        self.all_numbers: List[UrjoSquare] = []
+        self.all_numbers: List[Cell] = []
         # Technically you could just use all_numbers and not double store this but it makes it easier to read and comprehend imo
-        self.all_squares: List[UrjoSquare] = []
+        self.all_squares: List[Cell] = []
         self.contradiction_count = 0
         self.removed_by_identical = 0
 
@@ -25,7 +22,7 @@ class UrjoBoard():
         lines = []
         for row in self.rows:
             line = []
-            for square in row.row:
+            for square in row.cells:
                 if square.color == "blue":
                     line.append("b")
                 elif square.color == "red":
@@ -38,13 +35,13 @@ class UrjoBoard():
         return "\n".join(lines)
 
     @classmethod
-    def from_url(self, url_str: str, dim1: int, dim2: int):
+    def from_url(cls, url_str: str, dim1: int, dim2: int):
         """converts a url into a urjo puzzle"""
         alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         if len(url_str) != dim1 * dim2:
             raise ValueError("URL length does not match provided dimensions")
 
-        board = self()
+        board = cls()
         board.rows = [UrjoRow([]) for _ in range(dim2)]
         board.columns = [UrjoColumn([]) for _ in range(dim1)]
         board.all_squares = []
@@ -52,11 +49,11 @@ class UrjoBoard():
 
         for y in range(dim2):
             for x in range(dim1):
-                new_square = UrjoSquare(board, None, y, x)
+                new_square = Cell(board, None, y, x)
                 new_square.row = board.rows[y]
                 new_square.column = board.columns[x]
-                board.rows[y].row.append(new_square)
-                board.columns[x].column.append(new_square)
+                board.rows[y].cells.append(new_square)
+                board.columns[x].cells.append(new_square)
                 board.all_squares.append(new_square)
 
         for idx, ch in enumerate(url_str):
@@ -90,38 +87,29 @@ class UrjoBoard():
 
     def snapshot_state(self):
         """Stores the current board to revert to later"""
-        snap: list[tuple[UrjoSquare, Literal["red", "blue"], bool]] = []
+        snap: list[tuple[Cell, Color | None, bool]] = []
         for row in self.rows:
-            for sq in row.get_squares():
+            for sq in row.get_cells():
                 snap.append((sq, sq.color, sq.hidden))
         return snap
 
-    def restore_state(self, snapshot: list[tuple[UrjoSquare, Literal["red", "blue"], bool]]):
+    def restore_state(self, snapshot: list[tuple[Cell, Color | None, bool]]):
         """Reverts to the saved board"""
         for sq, col, hidden in snapshot:
             sq.color = col
             sq.hidden = hidden
 
-    def hide_numbers(self, remaining_numbers):
-        """Hides all but remaining_numbers numbers"""
-        random.shuffle(self.all_numbers)
-        for i, number in enumerate(self.all_numbers):
-            if i < remaining_numbers:
-                pass
-            else:
-                number.number_hidden = True
-
-    def get_surrounding_slots(self, square: UrjoSquare):
+    def get_surrounding_slots(self, square: Cell):
         """Returns the surrounding slots around a square"""
-        r = square.row_index
-        c = square.column_index
+        r = square.posX
+        c = square.posY
         rows = len(self.rows)
         cols = len(self.columns)
 
         def at(rr: int, cc: int):
             # return the cell at (rr,cc) if it exists, otherwise None.
             if 0 <= rr < rows and 0 <= cc < cols:
-                row_list = self.rows[rr].get_squares()
+                row_list = self.rows[rr].get_cells()
                 if 0 <= cc < len(row_list):
                     return row_list[cc]
             return None
@@ -137,7 +125,7 @@ class UrjoBoard():
 
         return up_left, up, up_right, left, right, down_left, down, down_right
 
-    def get_number(self, slot: UrjoSquare):
+    def get_number(self, slot: Cell):
         """Gets the number for a slot, doesnt work if not all slots are colored"""
         surrounding_slots = self.get_surrounding_slots(slot)
         color = slot.color
@@ -151,7 +139,7 @@ class UrjoBoard():
     def fill_numbers(self):
         """Puts all numbers on the full board"""
         for row in self.rows:
-            for square in row.row:
+            for square in row.cells:
                 self.get_number(square)
 
     def to_url_format(self):
@@ -160,7 +148,7 @@ class UrjoBoard():
         chars = []
 
         for row in self.rows:
-            for sq in row.get_squares():
+            for sq in row.get_cells():
                 if sq.number is not None and not sq.number_hidden:
                     num_val = sq.number + 1
                 else:
@@ -180,11 +168,11 @@ class UrjoBoard():
 
         return "".join(chars)
 
-    def fill_row(self, row):
+    def fill_half_full_row(self, row)-> Tuple[Literal[True], List[Cell]] | Tuple[Literal[False], List[Cell]]:
         """Fills a row if it can be filled with a color"""
         return self.__fill__(row, math.ceil(len(row.row)/2))
 
-    def fill_column(self, column):
+    def fill_half_full_column(self, column):
         """Fills a column if it can be filled with a color"""
         return self.__fill__(column, math.ceil(len(column.column)/2))
 
@@ -193,7 +181,7 @@ class UrjoBoard():
         red, blue, uncolored = obj.count_colors()
         squares = []
         if red == max:
-            for square in obj.get_squares():
+            for square in obj.get_cells():
                 if square.get_color() is None:  # uses get_color(), so only visiable colors are counted, be careful
                     square.color = "blue"
                     square.hidden = False
@@ -202,7 +190,7 @@ class UrjoBoard():
             return True, squares
 
         if blue == max:
-            for square in obj.get_squares():
+            for square in obj.get_cells():
                 if square.get_color() is None:  # uses get_color(), so only visiable colors are counted, be careful
                     square.color = "red"
                     square.hidden = False
@@ -222,120 +210,132 @@ class UrjoBoard():
             else:
                 sq.number_hidden = True
 
-def fill_single_number(slot: UrjoSquare):
-    """
-    Fills the number cell and/or its surrounding slots and returns a tuple(bool, list)
-    indicating whether it has changed anything and if it has, what
-    """
 
-    if slot is None:
-        raise ValueError("Invalid slot received")
+    def tryToFill(self, slot: Cell) -> Tuple[bool, List[Cell]]:
+        """
+        Fills the number cell and/or
+        its surrounding slots and returns a
+        tuple(bool, list(Cell)) indicating whether it has
+        changed anything and if it has, what
+        """
 
-    target = slot.get_number()
-    if target is None:
-        return False, []
+        if slot is None:
+            raise ValueError("Invalid slot received")
 
-    board = slot.board
-    surrounding_all = board.get_surrounding_slots(slot)
-    surrounding = [s for s in surrounding_all if s is not None]
-    total = len(surrounding)
-
-    # Should use get_color_counts instead
-    red = blue = uncol = 0
-    for slt in surrounding:
-        color = slt.get_color()
-        if color == "red":
-            red += 1
-        elif color == "blue":
-            blue += 1
-        else:
-            uncol += 1
-
-    # Just double checking the target isnt something stupid like 13 or lower then 0 which can technically be encoded
-    if target < 0 or target > total:
-        return False, []
-
-    required_same = target
-    required_opp = total - target
-
-    changed = False
-    filled_slots = []
-
-    # possibly determine the number cell's color
-    def feasible_if_color(color):
-        if color == "red":
-            same_count, opp_count = red, blue
-        else:
-            same_count, opp_count = blue, red
-        if same_count > required_same or same_count + uncol < required_same:
-            return False
-        if opp_count > required_opp or opp_count + uncol < required_opp:
-            return False
-        return True
-
-    num_color = slot.get_color()
-    if num_color is None:
-        can_red = feasible_if_color("red")
-        can_blue = feasible_if_color("blue")
-        if can_red != can_blue:
-            slot.color = "red" if can_red else "blue"
-            slot.hidden = False
-            changed = True
-            filled_slots.append(slot)
-            num_color = slot.color
-        elif not (can_red or can_blue):
+        thisNumber = slot.get_number()
+        if thisNumber is None:
             return False, []
 
-    if num_color is None:
-        return changed, filled_slots
+        all_surrounding_cells = self.get_surrounding_slots(slot)
+        surrounding_cells = [s for s in all_surrounding_cells if s is not None]
+        
+        # Should use get_color_counts instead
+        redCount = blueCount = uncoloredCount = 0
+        for slt in surrounding_cells:
+            color = slt.get_color()
+            if color == "red":
+                redCount += 1
+            elif color == "blue":
+                blueCount += 1
+            else:
+                uncoloredCount += 1
 
-    # forced fills among surrounding slots due to number
+        # Just double checking the target isnt something stupid like 13 or lower then 0 which can technically be encoded
+        if thisNumber < 0 or thisNumber > len(surrounding_cells):
+            return False, []
 
-    if num_color == "red":
-        same, opp = red, blue
-        same_col, opp_col = "red", "blue"
-    else:
-        same, opp = blue, red
-        same_col, opp_col = "blue", "red"
+        required_same = thisNumber
+        required_opp = len(surrounding_cells) - thisNumber
 
-    # same meets target (unassigned must be opposite)
-    if same == required_same and uncol > 0:
-        for s in surrounding:
-            if s.get_color() is None:
-                s.color = opp_col
-                s.hidden = False
+        changed = False
+        changed_cells = []
+
+        # possibly determine the number cell's color
+        def feasible_if_color(color):
+            if color == "red":
+                same_count, opp_count = redCount, blueCount
+            else:
+                same_count, opp_count = blueCount, redCount
+            if same_count > required_same or same_count + uncoloredCount < required_same:
+                return False
+            if opp_count > required_opp or opp_count + uncoloredCount < required_opp:
+                return False
+            return True
+
+        this_color = slot.get_color()
+        if this_color is None:
+            can_be_red = feasible_if_color("red")
+            can_be_blue = feasible_if_color("blue")
+            if can_be_red != can_be_blue:
+                slot.color = "red" if can_be_red else "blue"
+                slot.hidden = False
                 changed = True
-                filled_slots.append(s)
-        return changed, filled_slots
+                changed_cells.append(slot)
+                this_color = slot.color
+            elif not (can_be_red or can_be_blue):
+                return False, []
 
-    # opposite meets target (unassigned must be same)
-    if opp == required_opp and uncol > 0:
-        for s in surrounding:
-            if s.get_color() is None:
-                s.color = same_col
-                s.hidden = False
-                changed = True
-                filled_slots.append(s)
-        return changed, filled_slots
+        if this_color is None:
+            return changed, changed_cells
 
-    # same + uncol == required_same (all unassigned required to be the same)
-    if same + uncol == required_same and uncol > 0:
-        for s in surrounding:
-            if s.get_color() is None:
-                s.color = same_col
-                s.hidden = False
-                changed = True
-                filled_slots.append(s)
-        return changed, filled_slots
+        # forced fills among surrounding slots due to number
 
-    # opposite + uncol == required_opp (all unassigned opposite color)
-    if opp + uncol == required_opp and uncol > 0:
-        for s in surrounding:
-            if s.get_color() is None:
-                s.color = opp_col
-                changed = True
-                filled_slots.append(s)
-        return changed, filled_slots
+        if this_color == "red":
+            same_count, opp_count = redCount, blueCount
+            same_color, opp_color = "red", "blue"
+        else:
+            same_count, opp_count = blueCount, redCount
+            same_color, opp_color = "blue", "red"
 
-    # Can't fill any slots
-    return changed, filled_slots
+        # same meets target (unassigned must be opposite)
+        if same_count == required_same and uncoloredCount > 0:
+            for s in surrounding_cells:
+                if s.get_color() is None:
+                    s.color = opp_color
+                    s.hidden = False
+                    changed = True
+                    changed_cells.append(s)
+            return changed, changed_cells
+
+        # opposite meets target (unassigned must be same)
+        if opp_count == required_opp and uncoloredCount > 0:
+            for s in surrounding_cells:
+                if s.get_color() is None:
+                    s.color = same_color
+                    s.hidden = False
+                    changed = True
+                    changed_cells.append(s)
+            return changed, changed_cells
+
+        # same + uncol == required_same (all unassigned required to be the same)
+        if same_count + uncoloredCount == required_same and uncoloredCount > 0:
+            for s in surrounding_cells:
+                if s.get_color() is None:
+                    s.color = same_color
+                    s.hidden = False
+                    changed = True
+                    changed_cells.append(s)
+            return changed, changed_cells
+
+        # opposite + uncol == required_opp (all unassigned opposite color)
+        if opp_count + uncoloredCount == required_opp and uncoloredCount > 0:
+            for s in surrounding_cells:
+                if s.get_color() is None:
+                    s.color = opp_color
+                    changed = True
+                    changed_cells.append(s)
+            return changed, changed_cells
+
+        # Can't fill any slots
+        return changed, changed_cells
+
+    def check_identical(self, cell: Cell):
+        """Checks wether neighboring lines are the same"""
+        # row checks (compare current row to row above and below if they exist)
+        r_idx = cell.posX
+        if r_idx > 0:
+            if self.rows[r_idx - 1] == cell.row:
+                return False
+        if r_idx < len(self.rows) - 1:
+            if self.rows[r_idx + 1] == cell.row:
+                return False

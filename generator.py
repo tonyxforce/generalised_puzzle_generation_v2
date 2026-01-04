@@ -1,26 +1,32 @@
 from board import *
 from typing import List
-
+from collections import deque
 
 class UrjoGenerator():
-    """The Urjo puzzle, made up of rows and columns"""
+    board: Board
 
     def __init__(self):
-        self.board = UrjoBoard()
+        self.board = Board()
         self.removed_by_identical: int = 0
 
-    def number_check(self, slot: UrjoSquare):
+    def number_check(self, slot: Cell):
         """Checks if the number rule is violated"""
-        integer = slot.get_number()
-        if integer is None:
+        number = slot.get_number()
+        if number is None:
             return True
 
+        if slot is None:
+            raise Exception("slot cannot be None!")
+
+        if slot.row is None:
+            raise Exception("Cannot use outside of a row")
+
         red, blue, uncolored = get_color_counts(
-            self.board.get_surrounding_slots(slot))
-        surrounding = red + blue + uncolored
+            list(self.board.get_surrounding_slots(slot)))
+        surroundingCellCount = red + blue + uncolored
 
         # impossible number
-        if integer < 0 or integer > surrounding:
+        if number < 0 or number > surroundingCellCount:
             return False
 
         def feasible(required_same, same_count, opp_count, uncol):
@@ -34,7 +40,7 @@ class UrjoGenerator():
             if same_count + uncol < required_same:
                 return False
 
-            required_opp = surrounding - required_same
+            required_opp = surroundingCellCount - required_same
             if opp_count > required_opp:
                 return False
             if opp_count + uncol < required_opp:
@@ -46,14 +52,14 @@ class UrjoGenerator():
 
         if color is not None:
             if color == "blue":
-                return feasible(integer, blue, red, uncolored)
+                return feasible(number, blue, red, uncolored)
             elif color == "red":
-                return feasible(integer, red, blue, uncolored)
+                return feasible(number, red, blue, uncolored)
             else:
                 return False
         else:
-            ok_blue = feasible(integer, blue, red, uncolored)
-            ok_red = feasible(integer, red, blue, uncolored)
+            ok_blue = feasible(number, blue, red, uncolored)
+            ok_red = feasible(number, red, blue, uncolored)
             return ok_blue or ok_red
 
     def fill_board_backtracking(self, randomize_colors=True):
@@ -62,73 +68,84 @@ class UrjoGenerator():
         creates identical adjacent rows/columns. this doesnt take numbers into account at all, only filling a possible
         color arangement
         """
-        squares = [sq for row in self.board.rows for sq in row.get_squares()]
+        cells: List[Cell] = [
+            sq for row in self.board.rows for sq in row.get_cells()]
 
         def backtrack(index=0):
-            if index >= len(squares):
+            if index >= len(cells):
                 return True
 
-            square = squares[index]
-            if square.color is not None:
+            currentCell: Cell | None = cells[index]
+            if currentCell.color is not None:
                 return backtrack(index + 1)
 
-            colors = ["red", "blue"]
+            colors: List[Color] = ["red", "blue"]
             if randomize_colors:
                 random.shuffle(colors)
 
-            row_sqs = square.row.get_squares()
-            col_sqs = square.column.get_squares()
+            if currentCell.row is None or currentCell.column is None:
+                raise Exception("Cannot use on a sole cell!")
+
+            currentRow: List[Cell] = currentCell.row.get_cells()
+            currentCol: List[Cell] = currentCell.column.get_cells()
 
             for color in colors:
-                row_snapshot = [sq.color for sq in row_sqs]
-                col_snapshot = [sq.color for sq in col_sqs]
+                row_snapshot: List[Color | None] = [
+                    sq.color for sq in currentRow]
+                col_snapshot: List[Color | None] = [
+                    sq.color for sq in currentCol]
 
-                square.color = color
+                currentCell.color = color
 
                 # capture both the boolean and the list of squares that were auto-filled
-                row_filled, row_changed = self.board.fill_row(square.row)
-                col_filled, col_changed = self.board.fill_column(square.column)
+                row_filled, row_changed = self.board.fill_half_full_row(
+                    currentCell.row)
+                col_filled, col_changed = self.board.fill_half_full_column(
+                    currentCell.column)
 
                 # run all checks
                 checks_ok = True
-                if not square.row.check_row_critera():
+                if not currentCell.row.check_color_count():
                     checks_ok = False
-                if not square.column.check_row_critera():
+                if not currentCell.column.check_color_count():
                     checks_ok = False
 
                 # check adjacent rows/columns for identity regardless of fill
-                if square.row_index > 0:
-                    if self.board.rows[square.row_index - 1] == square.row:
+                if currentCell.posX > 0:
+                    if self.board.rows[currentCell.posX - 1] == currentCell.row:
                         checks_ok = False
-                if square.row_index < len(self.board.rows) - 1:
-                    if self.board.rows[square.row_index + 1] == square.row:
+                if currentCell.posX < len(self.board.rows) - 1:
+                    if self.board.rows[currentCell.posX + 1] == currentCell.row:
                         checks_ok = False
-                if square.column_index > 0:
-                    if self.board.columns[square.column_index - 1] == square.column:
+                if currentCell.posY > 0:
+                    if self.board.columns[currentCell.posY - 1] == currentCell.column:
                         checks_ok = False
-                if square.column_index < len(self.board.columns) - 1:
-                    if self.board.columns[square.column_index + 1] == square.column:
+                if currentCell.posY < len(self.board.columns) - 1:
+                    if self.board.columns[currentCell.posY + 1] == currentCell.column:
                         checks_ok = False
 
-                if row_filled and not not_identical(self.board.rows, square.row_index):
+                if row_filled and not nonIdentical(self.board.rows, currentCell.posX):
                     checks_ok = False
-                if col_filled and not not_identical(self.board.columns, square.column_index):
+                if col_filled and not nonIdentical(self.board.columns, currentCell.posY):
                     checks_ok = False
 
-                for changed in row_changed:
-                    if not changed.column.check_row_critera():
+                for change in row_changed:
+                    # Commented out because i don't know where this function went
+                    col: UrjoColumn = change.column
+                    if not col.check_color_count():
                         checks_ok = False
                         break
-                    if not self.check_identical(changed):
+                    if not self.board.check_identical(change):
                         checks_ok = False
                         break
 
                 if checks_ok:
-                    for changed in col_changed:
-                        if not changed.row.check_row_critera():
+                    for change in col_changed:
+                        row: UrjoRow = change.row
+                        if not row.check_color_count():
                             checks_ok = False
                             break
-                        if not self.check_identical(changed):
+                        if not self.board.check_identical(change):
                             checks_ok = False
                             break
 
@@ -137,11 +154,11 @@ class UrjoGenerator():
                         return True  # success
 
                 # restore snapshots
-                for sq, old in zip(row_sqs, row_snapshot):
+                for sq, old in zip(currentRow, row_snapshot):
                     sq.color = old
-                for sq, old in zip(col_sqs, col_snapshot):
+                for sq, old in zip(currentCol, col_snapshot):
                     sq.color = old
-                square.color = None
+                currentCell.color = None
 
             return False  # no color worked so backtrack
 
@@ -149,18 +166,18 @@ class UrjoGenerator():
 
     def fill_row(self, row: UrjoRow):
         """Fills a row if it can be filled with a color"""
-        return self.__fill__(row, math.ceil(len(row.row)/2))
+        return self.__fill__(row, math.ceil(len(row.cells)/2))
 
     def fill_column(self, column: UrjoColumn):
         """Fills a column if it can be filled with a color"""
-        return self.__fill__(column, math.ceil(len(column.column)/2))
+        return self.__fill__(column, math.ceil(len(column.cells)/2))
 
     def __fill__(self, obj: UrjoRow | UrjoColumn, max):
         """Fills an object will required remaining colors if possible, else does nothing"""
         red, blue, uncolored = obj.count_colors()
         squares = []
         if red == max:
-            for square in obj.get_squares():
+            for square in obj.get_cells():
                 if square.get_color() is None:  # uses get_color(), so only visiable colors are counted, be careful
                     square.color = "blue"
                     square.hidden = False
@@ -169,10 +186,10 @@ class UrjoGenerator():
             return True, squares
 
         if blue == max:
-            for square in obj.get_squares():
+            for square in obj.get_cells():
                 if square.get_color() is None:  # uses get_color(), so only visiable colors are counted, be careful
                     square.color = "red"
-                    square.hidden_bool = False
+                    square.hidden = False
                     squares.append(square)
 
             return True, squares
@@ -195,14 +212,14 @@ class UrjoGenerator():
         checks = []
 
         for row in self.board.rows:
-            for square in row.row:
+            for square in row.cells:
                 square.hidden = False
-            checks.append(row.check_row_critera())
+            checks.append(row.check_color_count())
 
         for column in self.board.columns:
-            for square in column.column:
+            for square in column.cells:
                 square.hidden = False
-            checks.append(column.check_row_critera())
+            checks.append(column.check_color_count())
         if not all(checks):
             print("CHECK FAILED:", puzzle)
 
@@ -233,16 +250,16 @@ class UrjoGenerator():
         """Creates a full board of colors and numbers"""
         self.board.rows = [UrjoRow([]) for _ in range(dim2)]
         self.board.columns = [UrjoColumn([]) for _ in range(dim1)]
-        self.all_squares: List[UrjoSquare] = []
-        self.all_numbers: List[UrjoSquare] = []
+        self.all_squares: List[Cell] = []
+        self.all_numbers: List[Cell] = []
 
         for y in range(dim2):
             for x in range(dim1):
-                new_square = UrjoSquare(self.board, None, y, x)
+                new_square = Cell(self.board, None, y, x)
                 new_square.row = self.board.rows[y]
                 new_square.column = self.board.columns[x]
-                self.board.rows[y].row.append(new_square)
-                self.board.columns[x].column.append(new_square)
+                self.board.rows[y].cells.append(new_square)
+                self.board.columns[x].cells.append(new_square)
                 self.board.all_squares.append(new_square)
                 self.board.all_numbers.append(new_square)
 
@@ -255,17 +272,17 @@ class UrjoGenerator():
             # mostly only happens if the board is weirdly shaped in a way that makes the rules not possible
             raise ValueError("Unable to color board with current constraints")
 
-    def uncolor_square(self, square: UrjoSquare, number_checks=True, row_checks=True, identical_checks=True, contradiction_count=1, max_steps_without_info=4):
+    def uncolor_square(self, square: Cell, number_checks=True, row_checks=True, identical_checks=True, contradiction_count=1, max_steps_without_info=4):
         """Sees if a square can be uncolored and the information recovered due to the other color being impossible to be there"""
         if self.can_be_color(square, invert_color(square.color), number_checks, row_checks, identical_checks, contradiction_count, original_contradiction=contradiction_count, max_steps_without_info=max_steps_without_info):
             return False
         square.hidden = True
         return True
 
-    def check_identical(self, slot: UrjoSquare):
+    def check_identical(self, slot: Cell):
         """Checks wether neighboring lines are the same"""
         # row checks (compare current row to row above and below if they exist)
-        r_idx = slot.row_index
+        r_idx = slot.posX
         if r_idx > 0:
             if self.board.rows[r_idx - 1] == slot.row:
                 return False
@@ -274,7 +291,7 @@ class UrjoGenerator():
                 return False
 
         # column checks (compare current column to column left and right if they exist)
-        c_idx = slot.column_index
+        c_idx = slot.posY
         if c_idx > 0:
             if self.board.columns[c_idx - 1] == slot.column:
                 return False
@@ -284,7 +301,7 @@ class UrjoGenerator():
 
         return True
 
-    def can_be_color(self, slot: UrjoSquare, color: Literal["red", "blue"],
+    def can_be_color(self, cell: Cell, color: Literal["red", "blue"] | None,
                      number_checks=True, row_checks=True, identical_checks=True,
                      contradiction_count=1, original_contradiction=1, max_steps_without_info=4):
         # memoization: currently removed due to it causing impossible puzzles
@@ -293,27 +310,27 @@ class UrjoGenerator():
         # snapshot full board state as random colors are being changed
         state = self.board.snapshot_state()
 
-        original = slot.color
-        original_hidden = slot.hidden
+        originalColor = cell.color
+        originalHidden = cell.hidden
 
         # seeing what happens if it was the other color
-        slot.color = color
-        slot.hidden = False
+        cell.color = color
+        cell.hidden = False
 
         # filling in all rows and columns that you can with the new information
-        queue = deque([slot])
-        queued_ids = {id(slot)}
+        queue = deque([cell])
+        queued_ids = {id(cell)}
         processed_ids = set()
         processed_numbers = set()
 
         while queue:
-            cur = queue.popleft()
-            cid = id(cur)
-            queued_ids.discard(cid)
-            processed_ids.add(cid)
+            currentCell = queue.popleft()
+            currentID = id(currentCell)
+            queued_ids.discard(currentID)
+            processed_ids.add(currentID)
             if row_checks:
-                row_changed = self.board.fill_row(cur.row)[1]
-                col_changed = self.board.fill_column(cur.column)[1]
+                row_changed = self.board.fill_half_full_row(currentCell.row)[1]
+                col_changed = self.board.fill_half_full_column(currentCell.column)[1]
 
                 for ch in row_changed:
                     fid = id(ch)
@@ -327,7 +344,7 @@ class UrjoGenerator():
                         queued_ids.add(fid)
 
             if number_checks:
-                surrounding = self.board.get_surrounding_slots(cur)
+                surrounding = self.board.get_surrounding_slots(currentCell)
                 for slt in surrounding:
                     if slt is None:
                         continue
@@ -338,7 +355,7 @@ class UrjoGenerator():
                         continue
                     processed_numbers.add(sid)
 
-                    changed, filled = fill_single_number(slt)
+                    changed, filled = self.board.tryToFill(slt)
                     if changed:
                         for f in filled:
                             fid = id(f)
@@ -352,11 +369,11 @@ class UrjoGenerator():
         # run the checks to see if we can quickly conclude anything from the slot
         checks = []
         if number_checks:
-            checks.append(self.check_surrounding_numbers(slot))
+            checks.append(self.check_surrounding_numbers(cell))
         if row_checks:
-            checks.append(check_row_and_column(slot))
+            checks.append(check_row_and_column(cell))
         if identical_checks:
-            checks.append(self.check_identical(slot))
+            checks.append(self.board.check_identical(cell))
             if contradiction_count == original_contradiction and not checks[-1]:
                 if all(checks[:-1]):
                     self.removed_by_identical += 1

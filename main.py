@@ -21,4 +21,3 @@ while True:
 
         print(generated_board.to_url_format(), generated_board.contradiction_count)
         
-        generator.true_check()

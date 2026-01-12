@@ -110,24 +110,24 @@ class UrjoGenerator():
                 if not currentCell.column.check_color_count():
                     checks_ok = False
 
-                # check adjacent rows/columns for identity regardless of fill
-                if currentCell.posX > 0:
-                    if self.board.rows[currentCell.posX - 1] == currentCell.row:
-                        checks_ok = False
-                if currentCell.posX < len(self.board.rows) - 1:
-                    if self.board.rows[currentCell.posX + 1] == currentCell.row:
-                        checks_ok = False
-                if currentCell.posY > 0:
-                    if self.board.columns[currentCell.posY - 1] == currentCell.column:
-                        checks_ok = False
-                if currentCell.posY < len(self.board.columns) - 1:
-                    if self.board.columns[currentCell.posY + 1] == currentCell.column:
-                        checks_ok = False
+                # # check adjacent rows/columns for identity regardless of fill
+                # if currentCell.posX > 0:
+                #     if self.board.rows[currentCell.posX - 1] == currentCell.row:
+                #         checks_ok = False
+                # if currentCell.posX < len(self.board.rows) - 1:
+                #     if self.board.rows[currentCell.posX + 1] == currentCell.row:
+                #         checks_ok = False
+                # if currentCell.posY > 0:
+                #     if self.board.columns[currentCell.posY - 1] == currentCell.column:
+                #         checks_ok = False
+                # if currentCell.posY < len(self.board.columns) - 1:
+                #     if self.board.columns[currentCell.posY + 1] == currentCell.column:
+                #         checks_ok = False
 
-                if row_filled and not nonIdentical(self.board.rows, currentCell.posX):
-                    checks_ok = False
-                if col_filled and not nonIdentical(self.board.columns, currentCell.posY):
-                    checks_ok = False
+                # if row_filled and not nonIdentical(self.board.rows, currentCell.posX):
+                #     checks_ok = False
+                # if col_filled and not nonIdentical(self.board.columns, currentCell.posY):
+                #     checks_ok = False
 
                 for change in row_changed:
                     # Commented out because i don't know where this function went
@@ -135,9 +135,9 @@ class UrjoGenerator():
                     if not col.check_color_count():
                         checks_ok = False
                         break
-                    if not self.board.check_identical(change):
-                        checks_ok = False
-                        break
+                    # if not self.board.check_identical(change):
+                    #     checks_ok = False
+                    #     break
 
                 if checks_ok:
                     for change in col_changed:
@@ -145,9 +145,9 @@ class UrjoGenerator():
                         if not row.check_color_count():
                             checks_ok = False
                             break
-                        if not self.board.check_identical(change):
-                            checks_ok = False
-                            break
+                        # if not self.board.check_identical(change):
+                        #     checks_ok = False
+                        #     break
 
                 if checks_ok:
                     if backtrack(index + 1):
